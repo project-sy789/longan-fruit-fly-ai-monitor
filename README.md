@@ -1,57 +1,166 @@
 # Longan Fruit Fly AI Monitor
 
-ต้นแบบเว็บสำหรับโครงงานวิทยาศาสตร์สิ่งประดิษฐ์ ม.ปลาย
+ต้นแบบระบบ **เครื่องดักจับและประเมินการระบาดของแมลงวันทองด้วย AI** สำหรับสวนลำไย อำเภอซับใหญ่ จังหวัดชัยภูมิ
 
-**หัวข้อแนะนำ:** การพัฒนาเครื่องดักจับและประเมินการระบาดของแมลงวันทองด้วยปัญญาประดิษฐ์ในสวนลำไย อำเภอซับใหญ่ จังหวัดชัยภูมิ
+## สถานะโปรเจกต์
 
-## แนวคิด
+พร้อมใช้งานเป็น prototype และเตรียม code สำหรับติดตั้งบนอุปกรณ์จริงแล้ว เหลือแค่รอ Raspberry Pi / กล้อง / ESP32-CAM มาเชื่อมต่อ
 
-ระบบจำลองอุปกรณ์ดักจับแมลงวันทองในสวนลำไย โดยรวม 5 ส่วนหลัก:
+## สิ่งที่ทำได้แล้ว
 
-1. สารล่อ เช่น methyl eugenol หรือสารล่อจากธรรมชาติ
-2. กับดัก/ถาดกาวสำหรับเก็บตัวอย่าง
-3. กล้องถ่ายภาพภายในกับดัก
-4. AI / Computer Vision ตรวจจับและนับจำนวนแมลงจากภาพ
-5. Dashboard + ระบบแจ้งเตือนเมื่อจำนวนแมลงเกินเกณฑ์
+- Dashboard ภาษาไทยสำหรับดูสถานะสวนลำไย
+- API รับข้อมูลจากอุปกรณ์จริง: `POST /api/readings`
+- API ดึงข้อมูลไปแสดงผล: `GET /api/readings`
+- Health check: `GET /api/health`
+- วิเคราะห์ภาพใน browser แบบ heuristic computer vision
+- Raspberry Pi camera agent พร้อม OpenCV
+- systemd service สำหรับเปิดเว็บและ agent อัตโนมัติหลัง boot
+- ESP32-CAM sketch starter
+- Script ติดตั้งอัตโนมัติบน Raspberry Pi / Linux
+- แจ้งเตือน Telegram ได้เมื่อจำนวนแมลงเกิน threshold
 
-## ฟีเจอร์ใน prototype นี้
+## สถาปัตยกรรมระบบ
 
-- Dashboard ภาษาไทยสำหรับสวนลำไย อำเภอซับใหญ่ จังหวัดชัยภูมิ
-- อัปโหลดภาพจากกับดักเพื่อวิเคราะห์จำนวนแมลง
-- โหมดภาพจำลองสำหรับทดลองทันที
-- วาด bounding box รอบวัตถุที่ระบบตรวจพบ
-- ประเมินระดับการระบาด: ต่ำ / เฝ้าระวัง / ระบาด
-- ตารางและกราฟแนวโน้มจำนวนแมลงรายวัน
-- หัวข้อบทที่ 2 สำหรับรายงานโครงงาน
+```text
+[สารล่อ/กับดัก] -> [กล้อง USB/RPi/ESP32-CAM]
+        -> [Python/OpenCV agent หรือ server vision]
+        -> [Next.js API /api/readings]
+        -> [Dashboard]
+        -> [Telegram/LINE alert]
+```
 
-## หมายเหตุเรื่อง AI
-
-เวอร์ชันนี้ใช้ heuristic computer vision ใน browser เพื่อให้รันง่าย ไม่ต้องมี server และไม่ต้องใช้ GPU เหมาะสำหรับ prototype โครงงาน
-
-เมื่อต้องทำจริง สามารถอัปเกรดเป็น:
-
-- YOLOv8 / YOLOv11 สำหรับตรวจจับแมลงวันทองจริง
-- TensorFlow Lite สำหรับ Raspberry Pi
-- ESP32-CAM ส่งภาพเข้า server วิเคราะห์
-- Telegram / LINE alert จริง
-
-## วิธีรัน
+## วิธีรันบนเครื่อง dev
 
 ```bash
 npm install
 npm run dev
 ```
 
-เปิดเว็บที่ `http://localhost:3000`
+เปิด `http://localhost:3000`
 
-## วิธี build ตรวจสอบ
+ทดสอบส่งข้อมูลจำลองเข้า API:
 
 ```bash
-npm run lint
-npm run build
+TRAP_API_TOKEN=change-me bash scripts/test-post-reading.sh
 ```
 
-## โครงสร้างบทที่ 2 ที่แนะนำ
+## วิธีติดตั้งอัตโนมัติบน Raspberry Pi
+
+บน Raspberry Pi หรือเครื่อง Linux ที่ต่อกล้อง:
+
+```bash
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/project-sy789/longan-fruit-fly-ai-monitor/main/scripts/install-pi.sh)"
+```
+
+หรือถ้า clone repo แล้ว:
+
+```bash
+git clone https://github.com/project-sy789/longan-fruit-fly-ai-monitor.git
+cd longan-fruit-fly-ai-monitor
+sudo bash scripts/install-pi.sh
+```
+
+หลังติดตั้ง:
+
+```bash
+sudo nano /etc/longan-fruit-fly/trap-agent.env
+sudo systemctl restart longan-fruit-fly-agent
+sudo systemctl status longan-fruit-fly-web
+sudo systemctl status longan-fruit-fly-agent
+```
+
+เปิด dashboard:
+
+```text
+http://<IP-Raspberry-Pi>:3000
+```
+
+## Config อุปกรณ์
+
+ไฟล์ตัวอย่าง: `config/trap-agent.env.example`
+
+```env
+TRAP_ID=A1
+TRAP_NAME=กับดัก A1
+TRAP_LOCATION=สวนลำไย อำเภอซับใหญ่ จังหวัดชัยภูมิ
+API_URL=http://localhost:3000/api/readings
+TRAP_API_TOKEN=change-me
+CAMERA_INDEX=0
+CAPTURE_INTERVAL_SECONDS=1800
+IMAGE_DIR=/var/lib/longan-fruit-fly/images
+ALERT_THRESHOLD=25
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
+```
+
+## API
+
+### GET `/api/readings`
+
+คืนรายการข้อมูลจากกับดัก ถ้ายังไม่มีข้อมูลจริงจะคืน demo data
+
+### POST `/api/readings`
+
+Header:
+
+```http
+Content-Type: application/json
+x-trap-token: change-me
+```
+
+Body:
+
+```json
+{
+  "trapId": "A1",
+  "trapName": "กับดัก A1",
+  "location": "สวนลำไย อำเภอซับใหญ่ จังหวัดชัยภูมิ",
+  "count": 27,
+  "temperature": 31,
+  "humidity": 78,
+  "battery": 92,
+  "source": "pi-agent"
+}
+```
+
+ระดับการระบาดคำนวณอัตโนมัติ:
+
+| จำนวนแมลง/รอบตรวจ | ระดับ |
+|---:|---|
+| 0–9 | ต่ำ |
+| 10–24 | เฝ้าระวัง |
+| 25+ | ระบาด |
+
+## Raspberry Pi Camera Agent
+
+ไฟล์: `scripts/trap_agent.py`
+
+ความสามารถ:
+
+- เปิดกล้อง `/dev/video0`
+- ถ่ายภาพตามรอบเวลา
+- วิเคราะห์วัตถุที่คล้ายแมลงวันทองด้วย OpenCV
+- บันทึกภาพ annotated
+- POST จำนวนเข้า API
+- ส่ง Telegram alert เมื่อเกิน threshold
+
+รันทดสอบครั้งเดียว:
+
+```bash
+RUN_ONCE=true python3 scripts/trap_agent.py
+```
+
+## ESP32-CAM
+
+ไฟล์: `hardware/esp32-cam/esp32_cam_trap_sender.ino`
+
+ใช้เป็น starter sketch สำหรับส่งข้อมูลเข้า API ก่อน เมื่อต้องส่งภาพจริงสามารถต่อยอดเป็น:
+
+- ESP32-CAM ถ่ายภาพ -> ส่ง HTTP multipart ไป server vision
+- ESP32-CAM ถ่ายภาพ -> upload ไป storage -> ส่ง URL เข้า API
+- ESP32-CAM ส่งแค่ metadata แล้วให้ Raspberry Pi ทำ AI
+
+## หัวข้อบทที่ 2 ที่แนะนำ
 
 1. แมลงวันทอง: ชีววิทยา วงจรชีวิต และความสำคัญทางเศรษฐกิจ
 2. ลำไยและบริบทสวนลำไยในอำเภอซับใหญ่ จังหวัดชัยภูมิ
@@ -61,15 +170,26 @@ npm run build
 6. IoT และระบบแจ้งเตือนอัตโนมัติสำหรับเกษตรกร
 7. งานวิจัยที่เกี่ยวข้องและช่องว่างของงานวิจัย
 
-## แนวทางต่อยอดเป็นอุปกรณ์จริง
+## สิ่งที่ต้องทำเมื่ออุปกรณ์มาถึง
 
-| ส่วน | อุปกรณ์แนะนำ |
-|---|---|
-| กล้อง | Raspberry Pi Camera / ESP32-CAM |
-| ประมวลผล | Raspberry Pi 4/5 หรือ server cloud |
-| สารล่อ | methyl eugenol หรือสารล่อธรรมชาติที่ทดสอบได้ |
-| แจ้งเตือน | Telegram Bot / LINE Messaging API |
-| เก็บข้อมูล | Google Sheets / Firebase / Supabase |
+- ต่อกล้องกับ Raspberry Pi
+- เช็คกล้อง: `v4l2-ctl --list-devices`
+- แก้ `CAMERA_INDEX` ใน `/etc/longan-fruit-fly/trap-agent.env`
+- ตั้ง `TRAP_API_TOKEN` ให้ตรงกับระบบ
+- ใส่ Telegram token/chat id ถ้าต้องการแจ้งเตือน
+- Restart service
+
+## หมายเหตุเรื่อง AI
+
+ตอนนี้ใช้ heuristic computer vision + OpenCV เพื่อให้ติดตั้งง่ายและอธิบายในโครงงานได้ง่าย
+
+ถ้าจะยกระดับเป็นระบบจริง แนะนำขั้นต่อไป:
+
+- เก็บภาพแมลงวันทองจริงจากกับดัก
+- Label ภาพด้วย Roboflow / CVAT
+- Train YOLOv8/YOLOv11
+- Export เป็น ONNX/TensorFlow Lite
+- แทน `count_fruit_fly_like_objects()` ใน `scripts/trap_agent.py`
 
 ## License
 

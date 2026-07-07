@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useMemo, useRef, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type Severity = "ต่ำ" | "เฝ้าระวัง" | "ระบาด";
 
@@ -22,7 +22,7 @@ type DetectionBox = {
   confidence: number;
 };
 
-const records: TrapRecord[] = [
+const demoRecords: TrapRecord[] = [
   { id: "1", trap: "กับดัก A1", date: "15 ก.ค.", count: 7, temperature: 29, humidity: 74, severity: "ต่ำ" },
   { id: "2", trap: "กับดัก A1", date: "16 ก.ค.", count: 13, temperature: 30, humidity: 78, severity: "เฝ้าระวัง" },
   { id: "3", trap: "กับดัก A1", date: "17 ก.ค.", count: 18, temperature: 31, humidity: 80, severity: "เฝ้าระวัง" },
@@ -141,17 +141,59 @@ export default function Home() {
   const [detections, setDetections] = useState<DetectionBox[]>([]);
   const [imageSize, setImageSize] = useState({ width: 1, height: 1 });
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [records, setRecords] = useState<TrapRecord[]>(demoRecords);
+  const [dataSource, setDataSource] = useState<"demo" | "api">("demo");
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const latest = records[records.length - 1];
+  useEffect(() => {
+    let alive = true;
+    async function loadReadings() {
+      try {
+        const response = await fetch("/api/readings", { cache: "no-store" });
+        const payload = await response.json();
+        const apiRecords: TrapRecord[] = (payload.readings || []).map((item: {
+          id: string;
+          trapName: string;
+          recordedAt: string;
+          count: number;
+          temperature?: number;
+          humidity?: number;
+          severity: Severity;
+          source?: string;
+        }) => ({
+          id: item.id,
+          trap: item.trapName,
+          date: new Date(item.recordedAt).toLocaleDateString("th-TH", { day: "numeric", month: "short" }),
+          count: item.count,
+          temperature: item.temperature ?? 0,
+          humidity: item.humidity ?? 0,
+          severity: item.severity,
+        }));
+        if (alive && apiRecords.length) {
+          setRecords(apiRecords);
+          setDataSource(apiRecords.some((item) => !item.id.startsWith("demo-")) ? "api" : "demo");
+        }
+      } catch {
+        if (alive) setDataSource("demo");
+      }
+    }
+    loadReadings();
+    const timer = window.setInterval(loadReadings, 30000);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  const latest = records[records.length - 1] || demoRecords[demoRecords.length - 1];
   const total = records.reduce((sum, item) => sum + item.count, 0);
-  const average = Math.round(total / records.length);
-  const maxCount = Math.max(...records.map((item) => item.count));
+  const average = Math.round(total / Math.max(records.length, 1));
+  const maxCount = Math.max(...records.map((item) => item.count), 1);
   const currentSeverity = classifySeverity(detections.length || latest.count);
 
   const chartBars = useMemo(
     () => records.map((item) => ({ ...item, width: `${Math.max(12, (item.count / maxCount) * 100)}%` })),
-    [maxCount]
+    [maxCount, records]
   );
 
   async function analyzeFile(event: ChangeEvent<HTMLInputElement>) {
@@ -246,7 +288,7 @@ export default function Home() {
               <h1 className="mt-1 text-xl font-black sm:text-2xl">เครื่องดักจับและประเมินการระบาดของแมลงวันทองด้วย AI</h1>
             </div>
             <div className="rounded-full bg-emerald-400 px-4 py-2 text-sm font-black text-emerald-950 shadow-lg shadow-emerald-500/25">
-              Prototype สำหรับโครงงาน ม.ปลาย
+              {dataSource === "api" ? "เชื่อมต่ออุปกรณ์แล้ว" : "Prototype สำหรับโครงงาน ม.ปลาย"}
             </div>
           </nav>
 
