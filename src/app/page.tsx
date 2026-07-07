@@ -32,16 +32,6 @@ const demoRecords: TrapRecord[] = [
   { id: "7", trap: "กับดัก C3", date: "21 ก.ค.", count: 16, temperature: 29, humidity: 79, severity: "เฝ้าระวัง" },
 ];
 
-const thesisSections = [
-  "2.1 แมลงวันทอง: ชีววิทยา วงจรชีวิต และความสำคัญทางเศรษฐกิจ",
-  "2.2 ลำไยและบริบทสวนลำไยในอำเภอซับใหญ่ จังหวัดชัยภูมิ",
-  "2.3 สารล่อแมลงวันทอง เช่น methyl eugenol และสารล่อจากธรรมชาติ",
-  "2.4 หลักการออกแบบกับดักแมลงวันทองและการเก็บตัวอย่างภาคสนาม",
-  "2.5 ปัญญาประดิษฐ์และ Computer Vision สำหรับตรวจจับ/นับจำนวนแมลง",
-  "2.6 IoT และระบบแจ้งเตือนอัตโนมัติสำหรับเกษตรกร",
-  "2.7 งานวิจัยที่เกี่ยวข้องและช่องว่างของงานวิจัย",
-];
-
 function classifySeverity(count: number): Severity {
   if (count >= 25) return "ระบาด";
   if (count >= 10) return "เฝ้าระวัง";
@@ -195,6 +185,29 @@ export default function Home() {
     () => records.map((item) => ({ ...item, width: `${Math.max(12, (item.count / maxCount) * 100)}%` })),
     [maxCount, records]
   );
+
+  const linePoints = useMemo(() => {
+    const width = 560;
+    const height = 210;
+    const pad = 24;
+    const denom = Math.max(records.length - 1, 1);
+    return records.map((item, index) => {
+      const x = pad + (index / denom) * (width - pad * 2);
+      const y = height - pad - (item.count / maxCount) * (height - pad * 2);
+      return { ...item, x, y };
+    });
+  }, [maxCount, records]);
+
+  const trapSummary = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const item of records) map.set(item.trap, (map.get(item.trap) || 0) + item.count);
+    return Array.from(map.entries()).map(([trap, count]) => ({ trap, count }));
+  }, [records]);
+
+  const severitySummary = useMemo(() => {
+    const levels: Severity[] = ["ต่ำ", "เฝ้าระวัง", "ระบาด"];
+    return levels.map((level) => ({ level, count: records.filter((item) => item.severity === level).length }));
+  }, [records]);
 
   async function analyzeFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -436,26 +449,76 @@ export default function Home() {
             </div>
           </section>
 
-          <section className="mt-6 grid gap-6 lg:grid-cols-3">
-            <div className="rounded-[2rem] border border-white/10 bg-white/10 p-6 backdrop-blur-2xl lg:col-span-2">
-              <h3 className="text-2xl font-black">หัวข้อบทที่ 2 ที่ใช้กับโปรเจกต์นี้</h3>
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                {thesisSections.map((section) => (
-                  <div key={section} className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm leading-6 text-white/80">
-                    {section}
-                  </div>
-                ))}
-              </div>
-            </div>
+          <section className="mt-6 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
             <div className="rounded-[2rem] border border-white/10 bg-white/10 p-6 backdrop-blur-2xl">
-              <h3 className="text-2xl font-black">สถาปัตยกรรมระบบ</h3>
-              <ol className="mt-5 space-y-3 text-sm leading-6 text-white/75">
-                <li>1. สารล่อ methyl eugenol/สารล่อธรรมชาติ ดึงดูดตัวผู้</li>
-                <li>2. กล้องถ่ายภาพถาดกาวทุก 30–60 นาที</li>
-                <li>3. AI ตรวจจับและนับจำนวนแมลงจากภาพ</li>
-                <li>4. บันทึกข้อมูลรายวันและประเมินระดับการระบาด</li>
-                <li>5. แจ้งเตือนเกษตรกรเมื่อเกิน threshold</li>
-              </ol>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-2xl font-black">กราฟแนวโน้มการระบาด</h3>
+                  <p className="mt-1 text-sm text-white/55">Line chart จำนวนแมลงต่อรอบตรวจ — ใช้ดูจุดพุ่งผิดปกติ</p>
+                </div>
+                <span className="rounded-full bg-emerald-300/15 px-3 py-1 text-xs font-black text-emerald-100">Trend</span>
+              </div>
+              <svg viewBox="0 0 560 210" className="mt-6 h-72 w-full overflow-visible rounded-3xl bg-black/20 p-2">
+                {[0.25, 0.5, 0.75].map((line) => (
+                  <line key={line} x1="24" x2="536" y1={210 * line} y2={210 * line} stroke="rgba(255,255,255,0.10)" strokeDasharray="5 7" />
+                ))}
+                <polyline
+                  fill="none"
+                  stroke="url(#trendGradient)"
+                  strokeWidth="5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  points={linePoints.map((point) => `${point.x},${point.y}`).join(" ")}
+                />
+                <defs>
+                  <linearGradient id="trendGradient" x1="0" x2="1" y1="0" y2="0">
+                    <stop offset="0%" stopColor="#34d399" />
+                    <stop offset="55%" stopColor="#fbbf24" />
+                    <stop offset="100%" stopColor="#fb7185" />
+                  </linearGradient>
+                </defs>
+                {linePoints.map((point) => (
+                  <g key={point.id}>
+                    <circle cx={point.x} cy={point.y} r="7" fill="#052e16" stroke="#a7f3d0" strokeWidth="3" />
+                    <text x={point.x} y={point.y - 13} textAnchor="middle" fill="#f8fafc" fontSize="13" fontWeight="900">{point.count}</text>
+                    <text x={point.x} y="202" textAnchor="middle" fill="rgba(255,255,255,0.55)" fontSize="11">{point.date}</text>
+                  </g>
+                ))}
+              </svg>
+            </div>
+
+            <div className="grid gap-6">
+              <div className="rounded-[2rem] border border-white/10 bg-white/10 p-6 backdrop-blur-2xl">
+                <h3 className="text-2xl font-black">รวมตามตำแหน่งกับดัก</h3>
+                <div className="mt-5 space-y-4">
+                  {trapSummary.map((item) => (
+                    <div key={item.trap}>
+                      <div className="mb-2 flex justify-between text-sm font-bold text-white/75">
+                        <span>{item.trap}</span>
+                        <span>{item.count} ตัว</span>
+                      </div>
+                      <div className="h-5 rounded-full bg-white/10">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-cyan-300 to-emerald-300"
+                          style={{ width: `${Math.max(10, (item.count / Math.max(...trapSummary.map((trap) => trap.count), 1)) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-[2rem] border border-white/10 bg-white/10 p-6 backdrop-blur-2xl">
+                <h3 className="text-2xl font-black">สัดส่วนระดับการระบาด</h3>
+                <div className="mt-5 grid grid-cols-3 gap-3">
+                  {severitySummary.map((item) => (
+                    <div key={item.level} className={`rounded-3xl p-4 text-center ${severityStyle(item.level)}`}>
+                      <p className="text-3xl font-black">{item.count}</p>
+                      <p className="mt-1 text-xs font-bold">{item.level}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </section>
         </div>
