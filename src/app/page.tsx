@@ -300,8 +300,13 @@ export default function Home() {
               <p className="text-xs uppercase tracking-[0.35em] text-emerald-200/80">Longan Fruit Fly AI Monitor</p>
               <h1 className="mt-1 text-xl font-black sm:text-2xl">เครื่องดักจับและประเมินการระบาดของแมลงวันทองด้วย AI</h1>
             </div>
-            <div className="rounded-full bg-emerald-400 px-4 py-2 text-sm font-black text-emerald-950 shadow-lg shadow-emerald-500/25">
-              {dataSource === "api" ? "เชื่อมต่ออุปกรณ์แล้ว" : "Prototype สำหรับโครงงาน ม.ปลาย"}
+            <div className="flex flex-wrap items-center gap-2">
+              <a href="/label" className="rounded-full bg-white px-4 py-2 text-sm font-black text-emerald-950 shadow-lg shadow-white/10">
+                Label รูป
+              </a>
+              <div className="rounded-full bg-emerald-400 px-4 py-2 text-sm font-black text-emerald-950 shadow-lg shadow-emerald-500/25">
+                {dataSource === "api" ? "เชื่อมต่ออุปกรณ์แล้ว" : "Prototype สำหรับโครงงาน ม.ปลาย"}
+              </div>
             </div>
           </nav>
 

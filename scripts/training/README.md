@@ -22,6 +22,23 @@ dataset_raw/images/
 
 ## 2) Label รูป
 
+### วิธีง่าย: label ผ่านเว็บใน repo นี้
+
+เปิดหน้า:
+
+```text
+http://localhost:3000/label
+```
+
+แล้วลากกล่องรอบแมลงวันทอง กด `Save YOLO` ระบบจะสร้างไฟล์ให้อัตโนมัติ:
+
+```text
+dataset_raw/images/
+dataset_raw/labels/
+```
+
+### วิธีภายนอก
+
 ใช้ Roboflow / CVAT / Label Studio / makesense.ai แล้ว export เป็น YOLO format
 
 โครงสร้างที่ต้องได้:
