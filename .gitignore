@@ -24,6 +24,10 @@
 .DS_Store
 *.pem
 /data/
+/public/uploads/
+/dataset_raw/
+/dataset_yolo/
+/runs/
 *.local
 .env.trap
 

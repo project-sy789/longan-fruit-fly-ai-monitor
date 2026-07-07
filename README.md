@@ -150,15 +150,33 @@ Body:
 RUN_ONCE=true python3 scripts/trap_agent.py
 ```
 
-## ESP32-CAM
+## โหมดง่ายสุด: ESP32-CAM มี WiFi แล้วส่งรูปเข้าเว็บ
 
 ไฟล์: `hardware/esp32-cam/esp32_cam_trap_sender.ino`
 
-ใช้เป็น starter sketch สำหรับส่งข้อมูลเข้า API ก่อน เมื่อต้องส่งภาพจริงสามารถต่อยอดเป็น:
+ถ้ามีเน็ต/WiFi ในสวน ไม่ต้องถอด SD card:
 
-- ESP32-CAM ถ่ายภาพ -> ส่ง HTTP multipart ไป server vision
-- ESP32-CAM ถ่ายภาพ -> upload ไป storage -> ส่ง URL เข้า API
-- ESP32-CAM ส่งแค่ metadata แล้วให้ Raspberry Pi ทำ AI
+```text
+ESP32-CAM -> ถ่ายภาพทุก 30 นาที -> POST รูปไป /api/images -> server เก็บรูปใน public/uploads
+```
+
+API ที่ใช้รับภาพ:
+
+```text
+POST /api/images
+Content-Type: image/jpeg
+x-trap-token: change-me
+x-trap-id: ESP32-A1
+x-trap-name: กับดัก ESP32-CAM A1
+```
+
+ดูคู่มือแบบง่ายที่:
+
+```text
+docs/simple-esp32-cam.md
+```
+
+ถ้าไม่มีเน็ตในสวน ค่อยใช้ทางเลือกเก็บรูปลง SD card แล้วไปถอดมาทีหลัง
 
 ## หัวข้อบทที่ 2 ที่แนะนำ
 
