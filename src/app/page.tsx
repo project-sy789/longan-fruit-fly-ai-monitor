@@ -1,65 +1,423 @@
-import Image from "next/image";
+"use client";
+
+import { ChangeEvent, useMemo, useRef, useState } from "react";
+
+type Severity = "ต่ำ" | "เฝ้าระวัง" | "ระบาด";
+
+type TrapRecord = {
+  id: string;
+  trap: string;
+  date: string;
+  count: number;
+  temperature: number;
+  humidity: number;
+  severity: Severity;
+};
+
+type DetectionBox = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  confidence: number;
+};
+
+const records: TrapRecord[] = [
+  { id: "1", trap: "กับดัก A1", date: "15 ก.ค.", count: 7, temperature: 29, humidity: 74, severity: "ต่ำ" },
+  { id: "2", trap: "กับดัก A1", date: "16 ก.ค.", count: 13, temperature: 30, humidity: 78, severity: "เฝ้าระวัง" },
+  { id: "3", trap: "กับดัก A1", date: "17 ก.ค.", count: 18, temperature: 31, humidity: 80, severity: "เฝ้าระวัง" },
+  { id: "4", trap: "กับดัก B2", date: "18 ก.ค.", count: 31, temperature: 32, humidity: 81, severity: "ระบาด" },
+  { id: "5", trap: "กับดัก B2", date: "19 ก.ค.", count: 24, temperature: 31, humidity: 76, severity: "เฝ้าระวัง" },
+  { id: "6", trap: "กับดัก C3", date: "20 ก.ค.", count: 38, temperature: 33, humidity: 72, severity: "ระบาด" },
+  { id: "7", trap: "กับดัก C3", date: "21 ก.ค.", count: 16, temperature: 29, humidity: 79, severity: "เฝ้าระวัง" },
+];
+
+const thesisSections = [
+  "2.1 แมลงวันทอง: ชีววิทยา วงจรชีวิต และความสำคัญทางเศรษฐกิจ",
+  "2.2 ลำไยและบริบทสวนลำไยในอำเภอซับใหญ่ จังหวัดชัยภูมิ",
+  "2.3 สารล่อแมลงวันทอง เช่น methyl eugenol และสารล่อจากธรรมชาติ",
+  "2.4 หลักการออกแบบกับดักแมลงวันทองและการเก็บตัวอย่างภาคสนาม",
+  "2.5 ปัญญาประดิษฐ์และ Computer Vision สำหรับตรวจจับ/นับจำนวนแมลง",
+  "2.6 IoT และระบบแจ้งเตือนอัตโนมัติสำหรับเกษตรกร",
+  "2.7 งานวิจัยที่เกี่ยวข้องและช่องว่างของงานวิจัย",
+];
+
+function classifySeverity(count: number): Severity {
+  if (count >= 25) return "ระบาด";
+  if (count >= 10) return "เฝ้าระวัง";
+  return "ต่ำ";
+}
+
+function severityStyle(severity: Severity) {
+  if (severity === "ระบาด") return "bg-rose-500/15 text-rose-200 ring-1 ring-rose-300/30";
+  if (severity === "เฝ้าระวัง") return "bg-amber-400/15 text-amber-100 ring-1 ring-amber-300/30";
+  return "bg-emerald-400/15 text-emerald-100 ring-1 ring-emerald-300/30";
+}
+
+function detectFruitFlyLikeObjects(imageData: ImageData): DetectionBox[] {
+  const { data, width, height } = imageData;
+  const mask = new Uint8Array(width * height);
+
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const chroma = max - min;
+    const idx = i / 4;
+
+    const goldenBody = r > 95 && g > 55 && g < 170 && b < 95 && chroma > 35;
+    const darkBody = r < 90 && g < 85 && b < 75 && chroma < 55;
+    const wingBrown = r > 80 && r < 170 && g > 55 && g < 135 && b > 35 && b < 115 && chroma > 20;
+
+    if (goldenBody || darkBody || wingBrown) mask[idx] = 1;
+  }
+
+  const visited = new Uint8Array(width * height);
+  const boxes: DetectionBox[] = [];
+  const queue: number[] = [];
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const start = y * width + x;
+      if (!mask[start] || visited[start]) continue;
+
+      let minX = x;
+      let maxX = x;
+      let minY = y;
+      let maxY = y;
+      let pixels = 0;
+      queue.length = 0;
+      queue.push(start);
+      visited[start] = 1;
+
+      while (queue.length) {
+        const p = queue.pop()!;
+        const px = p % width;
+        const py = Math.floor(p / width);
+        pixels += 1;
+        minX = Math.min(minX, px);
+        maxX = Math.max(maxX, px);
+        minY = Math.min(minY, py);
+        maxY = Math.max(maxY, py);
+
+        const neighbors = [p - 1, p + 1, p - width, p + width];
+        for (const n of neighbors) {
+          if (n < 0 || n >= width * height || visited[n] || !mask[n]) continue;
+          const nx = n % width;
+          if (Math.abs(nx - px) > 1) continue;
+          visited[n] = 1;
+          queue.push(n);
+        }
+      }
+
+      const w = maxX - minX + 1;
+      const h = maxY - minY + 1;
+      const area = w * h;
+      const fill = pixels / Math.max(area, 1);
+      const plausibleSize = pixels > 12 && pixels < width * height * 0.05;
+      const plausibleShape = w >= 4 && h >= 4 && w / h < 4.5 && h / w < 4.5;
+
+      if (plausibleSize && plausibleShape && fill > 0.12) {
+        boxes.push({
+          x: minX,
+          y: minY,
+          w,
+          h,
+          confidence: Math.min(0.97, 0.52 + fill * 0.38 + Math.min(pixels / 900, 0.22)),
+        });
+      }
+    }
+  }
+
+  return boxes
+    .sort((a, b) => b.confidence - a.confidence)
+    .slice(0, 80);
+}
 
 export default function Home() {
+  const [imageUrl, setImageUrl] = useState<string>("");
+  const [detections, setDetections] = useState<DetectionBox[]>([]);
+  const [imageSize, setImageSize] = useState({ width: 1, height: 1 });
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const latest = records[records.length - 1];
+  const total = records.reduce((sum, item) => sum + item.count, 0);
+  const average = Math.round(total / records.length);
+  const maxCount = Math.max(...records.map((item) => item.count));
+  const currentSeverity = classifySeverity(detections.length || latest.count);
+
+  const chartBars = useMemo(
+    () => records.map((item) => ({ ...item, width: `${Math.max(12, (item.count / maxCount) * 100)}%` })),
+    [maxCount]
+  );
+
+  async function analyzeFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setIsAnalyzing(true);
+
+    const url = URL.createObjectURL(file);
+    setImageUrl(url);
+
+    const image = new Image();
+    image.onload = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const maxSide = 900;
+      const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+      const width = Math.max(1, Math.round(image.width * scale));
+      const height = Math.max(1, Math.round(image.height * scale));
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) return;
+      ctx.drawImage(image, 0, 0, width, height);
+      const imageData = ctx.getImageData(0, 0, width, height);
+      const boxes = detectFruitFlyLikeObjects(imageData);
+      setImageSize({ width, height });
+      setDetections(boxes);
+      setIsAnalyzing(false);
+    };
+    image.src = url;
+  }
+
+  function loadDemoImage() {
+    const canvas = document.createElement("canvas");
+    canvas.width = 900;
+    canvas.height = 540;
+    const ctx = canvas.getContext("2d")!;
+    const gradient = ctx.createLinearGradient(0, 0, 900, 540);
+    gradient.addColorStop(0, "#fef3c7");
+    gradient.addColorStop(1, "#052e16");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 900, 540);
+
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.fillRect(70, 60, 760, 420);
+    ctx.fillStyle = "rgba(15,23,42,0.08)";
+    ctx.fillRect(95, 85, 710, 370);
+
+    for (let i = 0; i < 26; i += 1) {
+      const x = 120 + Math.random() * 640;
+      const y = 110 + Math.random() * 310;
+      const size = 7 + Math.random() * 8;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(Math.random() * Math.PI);
+      ctx.fillStyle = "rgba(80,45,18,0.92)";
+      ctx.beginPath();
+      ctx.ellipse(0, 0, size * 1.25, size * 0.7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(211,145,42,0.88)";
+      ctx.beginPath();
+      ctx.ellipse(size * 0.4, 0, size * 0.6, size * 0.45, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(245,245,220,0.50)";
+      ctx.beginPath();
+      ctx.ellipse(-size * 0.65, -size * 0.35, size * 0.8, size * 0.33, -0.3, 0, Math.PI * 2);
+      ctx.ellipse(-size * 0.65, size * 0.35, size * 0.8, size * 0.33, 0.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    setImageUrl(canvas.toDataURL("image/png"));
+    setIsAnalyzing(true);
+    setTimeout(() => {
+      const ctx2 = canvas.getContext("2d", { willReadFrequently: true })!;
+      const imageData = ctx2.getImageData(0, 0, canvas.width, canvas.height);
+      setImageSize({ width: canvas.width, height: canvas.height });
+      setDetections(detectFruitFlyLikeObjects(imageData));
+      setIsAnalyzing(false);
+    }, 250);
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="min-h-screen overflow-hidden bg-[#05130d] text-white">
+      <canvas ref={canvasRef} className="hidden" />
+      <section className="relative isolate px-5 py-8 sm:px-8 lg:px-12">
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,#20c99733,transparent_34%),radial-gradient(circle_at_70%_10%,#fbbf2430,transparent_28%),linear-gradient(135deg,#071a12,#071016_55%,#120b05)]" />
+        <div className="mx-auto max-w-7xl">
+          <nav className="mb-10 flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-white/10 bg-white/8 px-5 py-4 backdrop-blur-xl">
+            <div>
+              <p className="text-xs uppercase tracking-[0.35em] text-emerald-200/80">Longan Fruit Fly AI Monitor</p>
+              <h1 className="mt-1 text-xl font-black sm:text-2xl">เครื่องดักจับและประเมินการระบาดของแมลงวันทองด้วย AI</h1>
+            </div>
+            <div className="rounded-full bg-emerald-400 px-4 py-2 text-sm font-black text-emerald-950 shadow-lg shadow-emerald-500/25">
+              Prototype สำหรับโครงงาน ม.ปลาย
+            </div>
+          </nav>
+
+          <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="rounded-[2rem] border border-white/10 bg-white/10 p-6 shadow-2xl shadow-black/30 backdrop-blur-2xl sm:p-8">
+              <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-amber-200">สวนลำไย อำเภอซับใหญ่ จังหวัดชัยภูมิ</p>
+                  <h2 className="mt-2 max-w-3xl text-4xl font-black tracking-tight sm:text-6xl">
+                    ดัก ล่อ นับ และแจ้งเตือนแมลงวันทองแบบอัตโนมัติ
+                  </h2>
+                </div>
+              </div>
+              <p className="max-w-3xl text-lg leading-8 text-white/75">
+                ต้นแบบเว็บนี้จำลองระบบกับดักสารล่อ + กล้อง + AI ตรวจจับวัตถุ เพื่อช่วยเกษตรกรประเมินระดับการระบาดจากจำนวนแมลงที่ติดกับดักต่อวัน
+                พร้อม dashboard และแนวทางแจ้งเตือนผ่านมือถือ
+              </p>
+
+              <div className="mt-8 grid gap-3 sm:grid-cols-3">
+                {[
+                  ["จำนวนล่าสุด", `${detections.length || latest.count} ตัว`, currentSeverity],
+                  ["ค่าเฉลี่ย 7 วัน", `${average} ตัว/วัน`, "เฝ้าระวัง"],
+                  ["ความชื้นล่าสุด", `${latest.humidity}%`, "เหมาะต่อการระบาด"],
+                ].map(([label, value, note]) => (
+                  <div key={label} className="rounded-3xl border border-white/10 bg-black/20 p-5">
+                    <p className="text-sm text-white/55">{label}</p>
+                    <p className="mt-2 text-3xl font-black">{value}</p>
+                    <p className="mt-1 text-sm text-emerald-200">{note}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-[2rem] border border-amber-200/20 bg-amber-300/10 p-6 backdrop-blur-2xl">
+              <p className="text-sm font-black text-amber-200">สถานะการแจ้งเตือน</p>
+              <div className={`mt-4 inline-flex rounded-full px-4 py-2 text-sm font-black ${severityStyle(currentSeverity)}`}>
+                ระดับ: {currentSeverity}
+              </div>
+              <p className="mt-5 leading-7 text-white/75">
+                เกณฑ์ตัวอย่าง: 0–9 = ต่ำ, 10–24 = เฝ้าระวัง, 25+ = ระบาด ควรเข้าตรวจสวน/เปลี่ยนสารล่อ/วางกับดักเพิ่ม
+              </p>
+              <div className="mt-6 rounded-3xl bg-black/25 p-5 font-mono text-sm text-emerald-100">
+                IF count &gt;= 25 THEN<br />
+                SEND Telegram/LINE alert<br />
+                “พบแมลงวันทองสูงในกับดัก B2”
+              </div>
+            </div>
+          </div>
+
+          <section className="mt-6 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+            <div className="rounded-[2rem] border border-white/10 bg-white/10 p-6 backdrop-blur-2xl">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-2xl font-black">AI วิเคราะห์ภาพจากกับดัก</h3>
+                  <p className="mt-1 text-sm text-white/60">อัปโหลดภาพถาดกาว/ขวดดัก หรือใช้ภาพจำลอง</p>
+                </div>
+                <button onClick={loadDemoImage} className="rounded-full bg-white px-4 py-2 text-sm font-black text-emerald-950 transition hover:scale-105">
+                  ใช้ภาพจำลอง
+                </button>
+              </div>
+
+              <label className="mt-5 flex cursor-pointer flex-col items-center justify-center rounded-3xl border border-dashed border-emerald-200/40 bg-emerald-300/10 p-6 text-center transition hover:bg-emerald-300/15">
+                <span className="text-lg font-bold">เลือกภาพจากกล้อง</span>
+                <span className="mt-1 text-sm text-white/55">รองรับ JPG/PNG — วิเคราะห์ด้วย heuristic computer vision ใน browser</span>
+                <input className="hidden" type="file" accept="image/*" onChange={analyzeFile} />
+              </label>
+
+              <div className="relative mt-5 overflow-hidden rounded-3xl bg-black/35">
+                {imageUrl ? (
+                  <div className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={imageUrl} alt="ภาพจากกับดักแมลงวันทอง" className="h-auto w-full" />
+                    <svg className="absolute inset-0 h-full w-full" viewBox={`0 0 ${imageSize.width} ${imageSize.height}`} preserveAspectRatio="none">
+                      {detections.map((box, index) => (
+                        <g key={`${box.x}-${box.y}-${index}`}>
+                          <rect x={box.x} y={box.y} width={box.w} height={box.h} fill="none" stroke="#22c55e" strokeWidth="3" rx="6" />
+                          <text x={box.x} y={Math.max(14, box.y - 5)} fill="#dcfce7" fontSize="18" fontWeight="800">
+                            #{index + 1} {(box.confidence * 100).toFixed(0)}%
+                          </text>
+                        </g>
+                      ))}
+                    </svg>
+                  </div>
+                ) : (
+                  <div className="flex h-72 items-center justify-center text-white/45">ยังไม่มีภาพ</div>
+                )}
+              </div>
+
+              <div className="mt-5 grid grid-cols-3 gap-3 text-center">
+                <div className="rounded-2xl bg-black/20 p-4">
+                  <p className="text-sm text-white/55">ตรวจพบ</p>
+                  <p className="text-3xl font-black text-emerald-200">{isAnalyzing ? "..." : detections.length}</p>
+                </div>
+                <div className="rounded-2xl bg-black/20 p-4">
+                  <p className="text-sm text-white/55">AI confidence</p>
+                  <p className="text-3xl font-black text-amber-200">
+                    {detections.length ? `${Math.round((detections.reduce((s, d) => s + d.confidence, 0) / detections.length) * 100)}%` : "-"}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-black/20 p-4">
+                  <p className="text-sm text-white/55">สถานะ</p>
+                  <p className="text-xl font-black text-rose-200">{currentSeverity}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[2rem] border border-white/10 bg-white/10 p-6 backdrop-blur-2xl">
+              <h3 className="text-2xl font-black">แนวโน้มจำนวนแมลง</h3>
+              <div className="mt-6 space-y-4">
+                {chartBars.map((item) => (
+                  <div key={item.id}>
+                    <div className="mb-2 flex items-center justify-between text-sm">
+                      <span className="font-bold text-white/80">{item.date} · {item.trap}</span>
+                      <span className={`rounded-full px-3 py-1 text-xs font-black ${severityStyle(item.severity)}`}>{item.count} ตัว</span>
+                    </div>
+                    <div className="h-4 overflow-hidden rounded-full bg-white/10">
+                      <div className="h-full rounded-full bg-gradient-to-r from-emerald-300 via-amber-300 to-rose-400" style={{ width: item.width }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-8 overflow-hidden rounded-3xl border border-white/10">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-white/10 text-white/65">
+                    <tr>
+                      <th className="px-4 py-3">วัน</th>
+                      <th className="px-4 py-3">กับดัก</th>
+                      <th className="px-4 py-3">จำนวน</th>
+                      <th className="px-4 py-3">ระดับ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {records.slice().reverse().map((item) => (
+                      <tr key={item.id} className="border-t border-white/10">
+                        <td className="px-4 py-3">{item.date}</td>
+                        <td className="px-4 py-3">{item.trap}</td>
+                        <td className="px-4 py-3 font-black">{item.count}</td>
+                        <td className="px-4 py-3"><span className={`rounded-full px-3 py-1 text-xs font-black ${severityStyle(item.severity)}`}>{item.severity}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section className="mt-6 grid gap-6 lg:grid-cols-3">
+            <div className="rounded-[2rem] border border-white/10 bg-white/10 p-6 backdrop-blur-2xl lg:col-span-2">
+              <h3 className="text-2xl font-black">หัวข้อบทที่ 2 ที่ใช้กับโปรเจกต์นี้</h3>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                {thesisSections.map((section) => (
+                  <div key={section} className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm leading-6 text-white/80">
+                    {section}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-[2rem] border border-white/10 bg-white/10 p-6 backdrop-blur-2xl">
+              <h3 className="text-2xl font-black">สถาปัตยกรรมระบบ</h3>
+              <ol className="mt-5 space-y-3 text-sm leading-6 text-white/75">
+                <li>1. สารล่อ methyl eugenol/สารล่อธรรมชาติ ดึงดูดตัวผู้</li>
+                <li>2. กล้องถ่ายภาพถาดกาวทุก 30–60 นาที</li>
+                <li>3. AI ตรวจจับและนับจำนวนแมลงจากภาพ</li>
+                <li>4. บันทึกข้อมูลรายวันและประเมินระดับการระบาด</li>
+                <li>5. แจ้งเตือนเกษตรกรเมื่อเกิน threshold</li>
+              </ol>
+            </div>
+          </section>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      </section>
+    </main>
   );
 }

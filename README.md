@@ -1,36 +1,76 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Longan Fruit Fly AI Monitor
 
-## Getting Started
+ต้นแบบเว็บสำหรับโครงงานวิทยาศาสตร์สิ่งประดิษฐ์ ม.ปลาย
 
-First, run the development server:
+**หัวข้อแนะนำ:** การพัฒนาเครื่องดักจับและประเมินการระบาดของแมลงวันทองด้วยปัญญาประดิษฐ์ในสวนลำไย อำเภอซับใหญ่ จังหวัดชัยภูมิ
+
+## แนวคิด
+
+ระบบจำลองอุปกรณ์ดักจับแมลงวันทองในสวนลำไย โดยรวม 5 ส่วนหลัก:
+
+1. สารล่อ เช่น methyl eugenol หรือสารล่อจากธรรมชาติ
+2. กับดัก/ถาดกาวสำหรับเก็บตัวอย่าง
+3. กล้องถ่ายภาพภายในกับดัก
+4. AI / Computer Vision ตรวจจับและนับจำนวนแมลงจากภาพ
+5. Dashboard + ระบบแจ้งเตือนเมื่อจำนวนแมลงเกินเกณฑ์
+
+## ฟีเจอร์ใน prototype นี้
+
+- Dashboard ภาษาไทยสำหรับสวนลำไย อำเภอซับใหญ่ จังหวัดชัยภูมิ
+- อัปโหลดภาพจากกับดักเพื่อวิเคราะห์จำนวนแมลง
+- โหมดภาพจำลองสำหรับทดลองทันที
+- วาด bounding box รอบวัตถุที่ระบบตรวจพบ
+- ประเมินระดับการระบาด: ต่ำ / เฝ้าระวัง / ระบาด
+- ตารางและกราฟแนวโน้มจำนวนแมลงรายวัน
+- หัวข้อบทที่ 2 สำหรับรายงานโครงงาน
+
+## หมายเหตุเรื่อง AI
+
+เวอร์ชันนี้ใช้ heuristic computer vision ใน browser เพื่อให้รันง่าย ไม่ต้องมี server และไม่ต้องใช้ GPU เหมาะสำหรับ prototype โครงงาน
+
+เมื่อต้องทำจริง สามารถอัปเกรดเป็น:
+
+- YOLOv8 / YOLOv11 สำหรับตรวจจับแมลงวันทองจริง
+- TensorFlow Lite สำหรับ Raspberry Pi
+- ESP32-CAM ส่งภาพเข้า server วิเคราะห์
+- Telegram / LINE alert จริง
+
+## วิธีรัน
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+เปิดเว็บที่ `http://localhost:3000`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## วิธี build ตรวจสอบ
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run lint
+npm run build
+```
 
-## Learn More
+## โครงสร้างบทที่ 2 ที่แนะนำ
 
-To learn more about Next.js, take a look at the following resources:
+1. แมลงวันทอง: ชีววิทยา วงจรชีวิต และความสำคัญทางเศรษฐกิจ
+2. ลำไยและบริบทสวนลำไยในอำเภอซับใหญ่ จังหวัดชัยภูมิ
+3. สารล่อแมลงวันทอง เช่น methyl eugenol และสารล่อจากธรรมชาติ
+4. หลักการออกแบบกับดักแมลงวันทองและการเก็บตัวอย่างภาคสนาม
+5. ปัญญาประดิษฐ์และ Computer Vision สำหรับตรวจจับ/นับจำนวนแมลง
+6. IoT และระบบแจ้งเตือนอัตโนมัติสำหรับเกษตรกร
+7. งานวิจัยที่เกี่ยวข้องและช่องว่างของงานวิจัย
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## แนวทางต่อยอดเป็นอุปกรณ์จริง
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| ส่วน | อุปกรณ์แนะนำ |
+|---|---|
+| กล้อง | Raspberry Pi Camera / ESP32-CAM |
+| ประมวลผล | Raspberry Pi 4/5 หรือ server cloud |
+| สารล่อ | methyl eugenol หรือสารล่อธรรมชาติที่ทดสอบได้ |
+| แจ้งเตือน | Telegram Bot / LINE Messaging API |
+| เก็บข้อมูล | Google Sheets / Firebase / Supabase |
 
-## Deploy on Vercel
+## License
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT
