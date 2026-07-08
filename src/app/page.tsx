@@ -301,6 +301,9 @@ export default function Home() {
               <h1 className="mt-1 text-xl font-black sm:text-2xl">เครื่องดักจับและประเมินการระบาดของแมลงวันทองด้วย AI</h1>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <a href="/traps" className="rounded-full bg-amber-300/20 px-4 py-2 text-sm font-black text-amber-100">
+                จัดการกับดัก
+              </a>
               <a href="/label" className="rounded-full bg-white px-4 py-2 text-sm font-black text-emerald-950 shadow-lg shadow-white/10">
                 Label รูป
               </a>

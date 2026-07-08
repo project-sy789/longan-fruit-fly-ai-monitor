@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { MouseEvent, useEffect, useMemo, useRef, useState } from "react";
 
+const UNKNOWN_TRAP = "__unknown__";
+
 type ImageItem = { file: string; url: string; labeled: boolean };
 type Box = { x: number; y: number; w: number; h: number };
 
@@ -14,6 +16,11 @@ function normalizeBox(startX: number, startY: number, endX: number, endY: number
   return { x, y, w, h };
 }
 
+function trapFromFile(file: string) {
+  const idx = file.indexOf("_");
+  return idx > 0 ? file.slice(0, idx) : UNKNOWN_TRAP;
+}
+
 export default function LabelPage() {
   const [images, setImages] = useState<ImageItem[]>([]);
   const [selected, setSelected] = useState<ImageItem | null>(null);
@@ -21,17 +28,28 @@ export default function LabelPage() {
   const [draft, setDraft] = useState<Box | null>(null);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   const [status, setStatus] = useState("พร้อม label");
+  const [trapFilter, setTrapFilter] = useState("");
+  const [availableTraps, setAvailableTraps] = useState<string[]>([]);
   const imageWrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetch("/api/traps", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((payload) => setAvailableTraps((payload.traps || []).map((t: { id: string }) => t.id)));
+  }, []);
 
   useEffect(() => {
     fetch("/api/dataset/images", { cache: "no-store" })
       .then((res) => res.json())
       .then((payload) => {
-        const items = payload.images || [];
+        const items: ImageItem[] = payload.images || [];
         setImages(items);
-        if (items.length) setSelected(items[0]);
+        if (items.length) {
+          const first = trapFilter ? items.find((i) => trapFromFile(i.file) === trapFilter) : items[0];
+          setSelected(first || items[0]);
+        }
       });
-  }, []);
+  }, [trapFilter]);
 
   useEffect(() => {
     if (!selected) return;
@@ -40,7 +58,15 @@ export default function LabelPage() {
       .then((payload) => setBoxes(payload.boxes || []));
   }, [selected]);
 
-  const selectedIndex = useMemo(() => images.findIndex((item) => item.file === selected?.file), [images, selected]);
+  const filteredImages = useMemo(() => {
+    if (!trapFilter) return images;
+    return images.filter((item) => trapFromFile(item.file) === trapFilter);
+  }, [images, trapFilter]);
+
+  const selectedIndex = useMemo(
+    () => filteredImages.findIndex((item) => item.file === selected?.file),
+    [filteredImages, selected]
+  );
 
   function pointFromEvent(event: MouseEvent<HTMLDivElement>) {
     const rect = imageWrapRef.current!.getBoundingClientRect();
@@ -85,14 +111,14 @@ export default function LabelPage() {
     setImages((prev) => prev.map((item) => item.file === selected.file ? { ...item, labeled: true } : item));
   }
 
-  function nextImage() {
-    if (!images.length) return;
-    setSelected(images[Math.min(images.length - 1, selectedIndex + 1)]);
+  function prevImage() {
+    if (!filteredImages.length) return;
+    setSelected(filteredImages[Math.max(0, selectedIndex - 1)]);
   }
 
-  function prevImage() {
-    if (!images.length) return;
-    setSelected(images[Math.max(0, selectedIndex - 1)]);
+  function nextImage() {
+    if (!filteredImages.length) return;
+    setSelected(filteredImages[Math.min(filteredImages.length - 1, selectedIndex + 1)]);
   }
 
   function clearBoxes() {
@@ -118,9 +144,34 @@ export default function LabelPage() {
 
         <div className="grid gap-6 lg:grid-cols-[260px_1fr_260px]">
           <aside className="rounded-3xl border border-white/10 bg-white/10 p-4 backdrop-blur-xl">
+            <div className="mb-4">
+              <Link href="/traps" className="rounded-full bg-white/10 px-4 py-2 text-sm font-bold hover:bg-white/20">
+                จัดการกับดัก
+              </Link>
+            </div>
+
             <h2 className="font-black">รูปทั้งหมด</h2>
-            <div className="mt-4 max-h-[72vh] space-y-2 overflow-auto pr-1">
-              {images.map((item) => (
+
+            {availableTraps.length > 0 && (
+              <div className="mt-3">
+                <label className="text-xs text-white/55">กรองตามกับดัก</label>
+                <select
+                  className="mt-1 w-full rounded-xl bg-black/30 px-3 py-2 text-sm text-white outline-none ring-1 ring-white/20"
+                  value={trapFilter}
+                  onChange={(e) => setTrapFilter(e.target.value)}
+                >
+                  <option value="">ทั้งหมด ({images.length})</option>
+                  {availableTraps.map((trap) => (
+                    <option key={trap} value={trap}>
+                      {trap} ({images.filter((i) => trapFromFile(i.file) === trap).length})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="mt-4 max-h-[60vh] space-y-2 overflow-auto pr-1">
+              {filteredImages.map((item) => (
                 <button
                   key={item.file}
                   onClick={() => setSelected(item)}
@@ -130,7 +181,11 @@ export default function LabelPage() {
                   <span className="mt-1 block">{item.labeled ? "✅ labeled" : "ยังไม่ label"}</span>
                 </button>
               ))}
-              {!images.length && <p className="text-sm text-white/55">ยังไม่มีรูปใน public/uploads</p>}
+              {!filteredImages.length && (
+                <p className="text-sm text-white/55">
+                  {trapFilter ? `ไม่มีรูปจากกับดัก ${trapFilter}` : "ยังไม่มีรูปใน public/uploads"}
+                </p>
+              )}
             </div>
           </aside>
 
@@ -138,7 +193,7 @@ export default function LabelPage() {
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-xl font-black">{selected?.file || "ยังไม่ได้เลือกรูป"}</h2>
-                <p className="text-sm text-white/55">Class: fruit_fly (0)</p>
+                <p className="text-sm text-white/55">Class: fruit_fly (0) · กับดัก: {selected ? trapFromFile(selected.file) : "-"}</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button onClick={prevImage} className="rounded-full bg-white/10 px-4 py-2 text-sm font-bold">ก่อนหน้า</button>
@@ -185,11 +240,13 @@ export default function LabelPage() {
               </div>
               <div className="rounded-2xl bg-black/25 p-4">
                 <p className="text-3xl font-black text-amber-200">{images.filter((item) => item.labeled).length}</p>
-                <p className="text-xs text-white/55">รูปที่ label แล้ว</p>
+                <p className="text-xs text-white/55">
+                  รูปที่ label แล้ว{filteredImages.length !== images.length ? ` (กรอง ${filteredImages.length})` : ""}
+                </p>
               </div>
             </div>
             <ol className="mt-5 space-y-2 text-sm leading-6 text-white/70">
-              <li>1. เลือกรูปซ้ายมือ</li>
+              <li>1. เลือกรูปซ้ายมือ (กรองตามกับดักได้)</li>
               <li>2. ลากเมาส์ครอบแมลงวันทอง</li>
               <li>3. กด Save YOLO</li>
               <li>4. รูปจะถูกคัดลอกไป `dataset_raw/images`</li>
