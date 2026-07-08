@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Guard: this script is for Raspberry Pi / Debian Linux only
+if [[ "$(uname -s)" != "Linux" ]]; then
+  echo "This script is for Raspberry Pi / Linux only."
+  echo "On MacBook M1: use 'npm install && npm run dev' instead."
+  echo "See: docs/simple-esp32-cam.md"
+  exit 1
+fi
+
 APP_DIR="${APP_DIR:-/opt/longan-fruit-fly-ai-monitor}"
 REPO_URL="${REPO_URL:-https://github.com/project-sy789/longan-fruit-fly-ai-monitor.git}"
 SERVICE_USER="${SERVICE_USER:-pi}"
