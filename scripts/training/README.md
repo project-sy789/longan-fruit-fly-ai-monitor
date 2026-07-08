@@ -1,20 +1,22 @@
-# Training pipeline: ฝึก YOLO จากรูปจริง
+# Training pipeline: ฝึก YOLO จากรูปจริงบน MacBook M1
+
+แนวทางหลักของโปรเจกต์นี้คือใช้ ESP32-CAM เก็บภาพในสวน แล้วนำภาพมา label/train บน MacBook M1 ที่โรงเรียน ไม่จำเป็นต้องตั้ง Raspberry Pi ทิ้งไว้ในสวน
 
 ## 1) เก็บรูป
 
-รูปจาก ESP32-CAM/server จะอยู่ที่:
+ถ้า ESP32-CAM ส่งรูปเข้าเว็บที่รันบน MacBook/server รูปจะอยู่ที่:
 
 ```text
 public/uploads/
 ```
 
-รูปจาก Raspberry Pi agent จะอยู่ที่:
+ถ้าเลือกใช้ Raspberry Pi agent ภายหลัง รูปจะอยู่ที่:
 
 ```text
 /var/lib/longan-fruit-fly/images/
 ```
 
-คัดรูปที่หลากหลายมาไว้ใน:
+ถ้าใช้ SD card จาก ESP32-CAM ให้ copy รูปที่หลากหลายมาไว้ใน:
 
 ```text
 dataset_raw/images/
@@ -69,6 +71,8 @@ python3 scripts/training/prepare_dataset.py --src dataset_raw --out dataset_yolo
 
 ## 4) Train YOLO
 
+บน MacBook M1 แนะนำใช้ Python environment แยก เช่น `venv` หรือ `conda` แล้วติดตั้ง `ultralytics` ตามคำแนะนำของโปรเจกต์ YOLO ที่ใช้
+
 ```bash
 bash scripts/training/train_yolo.sh
 ```
@@ -85,7 +89,7 @@ EPOCHS=120 bash scripts/training/train_yolo.sh
 bash scripts/training/export_model.sh
 ```
 
-จะได้ ONNX สำหรับนำไปใช้ต่อกับ Raspberry Pi/server
+จะได้ ONNX สำหรับนำไปใช้ต่อกับ MacBook/server หรือ Raspberry Pi ถ้าต้องการระบบภาคสนามแบบ real-time ภายหลัง
 
 ## จำนวนรูปแนะนำ
 

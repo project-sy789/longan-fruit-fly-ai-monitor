@@ -4,7 +4,7 @@
 
 ## สถานะโปรเจกต์
 
-พร้อมใช้งานเป็น prototype และเตรียม code สำหรับติดตั้งบนอุปกรณ์จริงแล้ว เหลือแค่รอ Raspberry Pi / กล้อง / ESP32-CAM มาเชื่อมต่อ
+พร้อมใช้งานเป็น prototype สำหรับเก็บภาพจาก ESP32-CAM, label ภาพผ่านเว็บใน repo และ train โมเดลบน MacBook M1/เครื่องเรียน โดยไม่จำเป็นต้องตั้ง Raspberry Pi ทิ้งไว้ในสวน
 
 ## สิ่งที่ทำได้แล้ว
 
@@ -13,8 +13,10 @@
 - API ดึงข้อมูลไปแสดงผล: `GET /api/readings`
 - Health check: `GET /api/health`
 - วิเคราะห์ภาพใน browser แบบ heuristic computer vision
-- Raspberry Pi camera agent พร้อม OpenCV
-- systemd service สำหรับเปิดเว็บและ agent อัตโนมัติหลัง boot
+- หน้า `/label` สำหรับวาดกรอบแมลงวันทองและบันทึก label แบบ YOLO
+- Training pipeline สำหรับเตรียม dataset และ train YOLO บนคอม/Cloud
+- Raspberry Pi camera agent พร้อม OpenCV สำหรับกรณีต้องการติดตั้งระบบประมวลผลในสวนแบบ 24 ชั่วโมง
+- systemd service สำหรับเปิดเว็บและ agent อัตโนมัติหลัง boot บน Raspberry Pi/Linux
 - ESP32-CAM sketch starter
 - Script ติดตั้งอัตโนมัติบน Raspberry Pi / Linux
 - แจ้งเตือน Telegram ได้เมื่อจำนวนแมลงเกิน threshold
@@ -22,11 +24,11 @@
 ## สถาปัตยกรรมระบบ
 
 ```text
-[สารล่อ/กับดัก] -> [กล้อง USB/RPi/ESP32-CAM]
-        -> [Python/OpenCV agent หรือ server vision]
-        -> [Next.js API /api/readings]
-        -> [Dashboard]
-        -> [Telegram/LINE alert]
+[สารล่อ/กับดัก] -> [ESP32-CAM]
+        -> [เก็บรูปลง SD card หรือ POST ไป /api/images]
+        -> [MacBook M1 เปิดเว็บ /label เพื่อทำ dataset]
+        -> [Train YOLO บน MacBook M1/Cloud]
+        -> [Dashboard / วิเคราะห์ภาพ / แจ้งเตือน]
 ```
 
 ## วิธีรันบนเครื่อง dev
@@ -38,13 +40,46 @@ npm run dev
 
 เปิด `http://localhost:3000`
 
+เปิดหน้า label dataset:
+
+```text
+http://localhost:3000/label
+```
+
+แนะนำสำหรับโปรเจกต์นี้: ใช้ MacBook M1 เป็นเครื่องหลักสำหรับรันเว็บ, label ภาพ และ train โมเดลที่โรงเรียน ส่วน ESP32-CAM ใช้เก็บภาพจากสวนเท่านั้น
+
+## Workflow ที่แนะนำโดยไม่ใช้ Raspberry Pi
+
+```text
+ESP32-CAM ถ่ายรูปในสวน
+-> ส่งรูปผ่าน WiFi/Hotspot หรือเก็บลง SD card
+-> นำรูปเข้า MacBook M1
+-> เปิด /label เพื่อวาดกรอบแมลงวันทอง
+-> Save เป็น YOLO dataset
+-> Train YOLO บน MacBook M1
+```
+
+เตรียม dataset หลัง label:
+
+```bash
+python3 scripts/training/prepare_dataset.py --src dataset_raw --out dataset_yolo
+```
+
+Train YOLO:
+
+```bash
+bash scripts/training/train_yolo.sh
+```
+
 ทดสอบส่งข้อมูลจำลองเข้า API:
 
 ```bash
 TRAP_API_TOKEN=change-me bash scripts/test-post-reading.sh
 ```
 
-## วิธีติดตั้งอัตโนมัติบน Raspberry Pi
+## ทางเลือก: ติดตั้งอัตโนมัติบน Raspberry Pi
+
+ส่วนนี้เป็นทางเลือกเท่านั้น ใช้เมื่ออยากให้มีเครื่องประมวลผล/เปิด dashboard/นับแมลงในสวนตลอด 24 ชั่วโมง ถ้าเป้าหมายคือเก็บภาพแล้ว train ที่โรงเรียน สามารถข้าม Raspberry Pi ได้
 
 บน Raspberry Pi หรือเครื่อง Linux ที่ต่อกล้อง:
 
@@ -131,7 +166,7 @@ Body:
 | 10–24 | เฝ้าระวัง |
 | 25+ | ระบาด |
 
-## Raspberry Pi Camera Agent
+## Raspberry Pi Camera Agent optional
 
 ไฟล์: `scripts/trap_agent.py`
 
@@ -188,7 +223,7 @@ docs/simple-esp32-cam.md
 6. IoT และระบบแจ้งเตือนอัตโนมัติสำหรับเกษตรกร
 7. งานวิจัยที่เกี่ยวข้องและช่องว่างของงานวิจัย
 
-## สิ่งที่ต้องทำเมื่ออุปกรณ์มาถึง
+## ถ้าจะใช้ Raspberry Pi ภายหลัง
 
 - ต่อกล้องกับ Raspberry Pi
 - เช็คกล้อง: `v4l2-ctl --list-devices`
@@ -204,7 +239,7 @@ docs/simple-esp32-cam.md
 ถ้าจะยกระดับเป็นระบบจริง แนะนำขั้นต่อไป:
 
 - เก็บภาพแมลงวันทองจริงจากกับดัก
-- Label ภาพด้วย Roboflow / CVAT
+- Label ภาพผ่านหน้า `/label` ใน repo นี้ หรือใช้ Roboflow / CVAT
 - Train YOLOv8/YOLOv11
 - Export เป็น ONNX/TensorFlow Lite
 - แทน `count_fruit_fly_like_objects()` ใน `scripts/trap_agent.py`

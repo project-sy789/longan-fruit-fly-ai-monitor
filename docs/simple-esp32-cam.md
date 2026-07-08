@@ -1,18 +1,18 @@
 # โหมดง่ายสุด: ESP32-CAM only
 
-โหมดนี้เหมาะกับผู้ใช้ที่อยากทำให้ง่ายที่สุด ไม่ใช้ Raspberry Pi ก่อน
+โหมดนี้เหมาะกับผู้ใช้ที่อยากทำให้ง่ายที่สุด: ใช้ ESP32-CAM เก็บภาพในสวน แล้วใช้ MacBook M1 ที่โรงเรียนสำหรับ label และ train โดยไม่ต้องตั้ง Raspberry Pi ทิ้งไว้ในสวน
 
 ## สิ่งที่ต้องมี
 
 - ESP32-CAM AI Thinker 1 ตัว
 - FTDI USB-to-Serial สำหรับ upload code
 - WiFi ในบริเวณสวน หรือ hotspot มือถือ
-- Server/Dashboard ที่รัน repo นี้อยู่
+- MacBook M1/คอมที่รัน repo นี้อยู่ หรือ server/dashboard ถ้ามี WiFi ในสวน
 
 ## หลักการ
 
 ```text
-ESP32-CAM -> ถ่ายภาพ -> POST รูปไป /api/images -> Dashboard เก็บรูปไว้ใช้ดู/ทำ dataset
+ESP32-CAM -> ถ่ายภาพ -> POST รูปไป /api/images หรือเก็บลง SD card -> MacBook M1 ใช้ดู/label/train dataset
 ```
 
 ข้อดี:
@@ -22,8 +22,9 @@ ESP32-CAM -> ถ่ายภาพ -> POST รูปไป /api/images -> Dashbo
 
 ข้อจำกัด:
 - ESP32-CAM ไม่เหมาะกับการรัน AI หนัก ๆ บนบอร์ด
-- เวอร์ชันง่ายนี้เน้นเก็บภาพและส่งเข้าระบบก่อน
-- การนับแมลงแบบ AI ควรทำบน server/Raspberry Pi ภายหลัง
+- เวอร์ชันง่ายนี้เน้นเก็บภาพจริงเพื่อทำ dataset ก่อน
+- การ label และ train AI ควรทำบน MacBook M1/คอม/Cloud
+- Raspberry Pi เป็น optional เฉพาะกรณีต้องการระบบประมวลผลในสวนตลอดเวลา
 
 ## ขั้นตอนใช้งาน
 
@@ -62,7 +63,7 @@ const char* TRAP_ID = "ESP32-A1";
 
 ## ถ้าไม่มี WiFi ในสวน
 
-ใช้ hotspot มือถือช่วงติดตั้งก่อน หรือใช้โหมดเก็บภาพใน SD card ภายหลัง
+ใช้ SD card เก็บภาพ แล้วค่อยนำรูปเข้า MacBook M1 เพื่อ label/train ที่โรงเรียน หรือใช้ hotspot มือถือเฉพาะตอนต้องการส่งรูปทดสอบ
 
 ## ถ้าต้องการ AI จริง
 
@@ -70,5 +71,6 @@ const char* TRAP_ID = "ESP32-A1";
 
 1. ใช้ ESP32-CAM เก็บภาพจริง 3–7 วัน
 2. เอาภาพมา label
-3. Train YOLO บนคอม/Cloud
-4. ให้ server/Raspberry Pi วิเคราะห์ภาพจาก ESP32-CAM
+3. เปิดหน้า `http://localhost:3000/label` บน MacBook M1 แล้ววาดกรอบ
+4. Train YOLO บน MacBook M1/Cloud
+5. ถ้าต้องการใช้งานภาคสนามแบบ real-time ภายหลัง ค่อยเพิ่ม server/Raspberry Pi สำหรับวิเคราะห์ภาพ
